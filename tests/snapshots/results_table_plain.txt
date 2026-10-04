@@ -1,0 +1,9 @@
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Step           ┃ Status      ┃  Time ┃ Tries ┃ Detail                               ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ dns_lookup     │ SUCCESS     │  0.1s │     1 │                                      │
+│ rdap_lookup    │ DEGRADED    │  1.5s │     1 │                                      │
+│ host_search    │ ERROR       │ 30.0s │     2 │ api.hackertarget.com: ConnectTimeout │
+│ wayback_urls   │ UNAVAILABLE │  0.0s │     0 │ web.archive.org HTTP 404             │
+│ subdomain_enum │ SKIPPED     │  0.0s │     0 │ Confirmation not given               │
+└────────────────┴─────────────┴───────┴───────┴──────────────────────────────────────┘

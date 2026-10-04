@@ -1,0 +1,14 @@
+name: phone_recon
+description: Offline phone validation (country, carrier, line type). No registration probing.
+input_type: phone
+risk: low
+steps:
+  - id: phone_check
+    type: phone
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 10
+    retry: 1
+    risk: low
+    require_confirmation: false

@@ -1,0 +1,14 @@
+name: image
+description: Offline EXIF/XMP metadata of a local image file (camera, serials, capture times, GPS). Never uploads the image.
+input_type: image_file
+risk: low
+steps:
+  - id: image_metadata
+    type: image_exif
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 1
+    risk: low
+    require_confirmation: false

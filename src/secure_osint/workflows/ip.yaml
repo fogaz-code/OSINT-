@@ -1,0 +1,40 @@
+name: ip_recon
+description: >-
+  IP ownership (RDAP) and exposure (Shodan InternetDB), plus a forward DNS check of the hostname
+  InternetDB reports for the address.
+input_type: ip
+risk: low
+steps:
+  # Independent lookups on the target itself: they run in parallel.
+  - id: rdap_ip
+    type: rdap
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false
+  - id: exposure
+    type: shodan_internetdb
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false
+  # InternetDB data can be a week old: the hostname it reports for this IP is resolved again
+  # (forward-confirmed reverse DNS) instead of being trusted as current. It stays on the same
+  # target: the hostname is a name of this IP, not a pivot to another entity. Without a reported
+  # hostname the reference is unresolved and the step is reported as such, never guessed.
+  - id: hostname_check
+    type: dns
+    params:
+      input: "{{ steps.exposure.data.hostnames[0] }}"
+    depends_on: [exposure]
+    optional_dependencies: []
+    timeout: 30
+    retry: 1
+    risk: low
+    require_confirmation: false

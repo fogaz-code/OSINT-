@@ -1,0 +1,9 @@
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃[1m [0m[1mStep          [0m[1m [0m┃[1m [0m[1mStatus     [0m[1m [0m┃[1m [0m[1m Time[0m[1m [0m┃[1m [0m[1mTries[0m[1m [0m┃[1m [0m[1mDetail                              [0m[1m [0m┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ dns_lookup     │ [32mSUCCESS[0m     │  0.1s │     1 │                                      │
+│ rdap_lookup    │ [33mDEGRADED[0m    │  1.5s │     1 │                                      │
+│ host_search    │ [31mERROR[0m       │ 30.0s │     2 │ api.hackertarget.com: ConnectTimeout │
+│ wayback_urls   │ [35mUNAVAILABLE[0m │  0.0s │     0 │ web.archive.org HTTP 404             │
+│ subdomain_enum │ [2mSKIPPED[0m     │  0.0s │     0 │ Confirmation not given               │
+└────────────────┴─────────────┴───────┴───────┴──────────────────────────────────────┘

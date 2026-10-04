@@ -1,0 +1,19 @@
+name: generic
+description: >-
+  Free-text target (a person's or organisation's name, a hyphenated handle): public GitHub user
+  search for candidate accounts. Matches are suggested pivots to verify manually, never followed.
+input_type: generic
+risk: low
+# Only sources that accept free text belong here. Domain sources (dns, rdap, wayback, crt_sh,
+# hackertarget) reject any non-domain input, and the username source rejects spaces and hyphens,
+# so either would make this workflow end UNAVAILABLE by construction.
+steps:
+  - id: github_user_search
+    type: github
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false

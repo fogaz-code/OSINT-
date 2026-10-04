@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Python dependencies declared in pyproject.toml (runtime, extras and dev tools).
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Do not propose a release in its first week: most malicious or broken uploads are yanked by then.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels: [dependencies]
+    groups:
+      dev-tools:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # Actions are pinned to commit SHAs; Dependabot updates the SHA and its version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(ci)
+    labels: [dependencies, ci]
+    groups:
+      github-actions:
+        patterns: ['*']

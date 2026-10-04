@@ -1,0 +1,15 @@
+name: wallet
+description: Public on-chain activity of a BTC, ETH or TRON address (keyless block explorers, no transaction details)
+input_type: wallet
+risk: low
+steps:
+  - id: chain_lookup
+    type: chain
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    # Esplora paging plus conservative per-host rate limits can take a while on small histories.
+    timeout: 60
+    retry: 2
+    risk: low
+    require_confirmation: false

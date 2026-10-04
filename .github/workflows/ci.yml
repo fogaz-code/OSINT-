@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Weekly run on main: dependency ranges are not locked, so a new upstream release (or a newly
+  # published advisory for pip-audit) can break the build without any commit here.
+  schedule:
+    - cron: '17 4 * * 1'
+
+# Nothing at the top level: every job declares the minimum it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A newer push to the same PR makes the running checks obsolete; runs on main always complete.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  PIP_NO_INPUT: '1'
+  # PYTHONUTF8 is deliberately NOT set: Windows runners default to cp1252, which is how text IO
+  # without an explicit encoding gets caught.
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      # All extras installed so mypy sees the real gradio/pyvis/exifread APIs.
+      - run: python -m pip install -e ".[dev,gui,graph,image]"
+      - run: ruff check src tests
+      # Every check runs even if the previous one failed: a lint error must not hide a type error.
+      - run: ruff format --check src tests
+        if: success() || failure()
+      - run: mypy src tests
+        if: success() || failure()
+
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      # One red cell must not hide the others: OS-specific failures are the point of the matrix.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.13']
+        include:
+          - os: ubuntu-latest
+            python-version: '3.11'
+          - os: ubuntu-latest
+            python-version: '3.12'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e ".[dev,gui,graph,image]"
+      - name: Run the test suite (no test may skip for a missing extra)
+        run: |
+          python -m pytest -q -rs | tee pytest.log
+          # The graph/GUI/image security tests use pytest.importorskip: with an extra missing they
+          # would pass by skipping. In this job every extra is installed, so such a skip is a failure.
+          if grep -i "could not import" pytest.log; then
+            echo "::error::A test was skipped because an optional dependency is missing"
+            exit 1
+          fi
+
+  test-minimal:
+    name: Tests without optional extras
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      # CLI-only install: keeps the fallbacks for a missing gradio/pyvis/exifread tested.
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q -rs
+
+  pip-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      # Audit exactly what a user installs (runtime dependencies and every runtime extra), resolved
+      # in a separate virtualenv so pip-audit's own dependencies do not end up in the audited set.
+      - name: Resolve the runtime dependency set
+        run: |
+          python -m venv "$RUNNER_TEMP/target"
+          "$RUNNER_TEMP/target/bin/python" -m pip install ".[gui,graph,image]"
+          "$RUNNER_TEMP/target/bin/python" -m pip freeze --exclude secure-osint > audit-requirements.txt
+          cat audit-requirements.txt
+      - run: python -m pip install "pip-audit==2.10.1"
+      # Every ignore needs a written justification and an exit condition. PYSEC-2026-2447
+      # (CVE-2025-69872, diskcache pickle deserialisation; no fixed release exists) is mitigated by
+      # secure_osint.utils.safe_disk.SafeDisk, which never unpickles and confines value files to the
+      # cache directory (tests/test_cache_tamper.py). Remove the ignore once diskcache ships a fix.
+      - name: pip-audit
+        run: >-
+          python -m pip_audit --strict --progress-spinner off --desc on --disable-pip --no-deps
+          -r audit-requirements.txt
+          --ignore-vuln PYSEC-2026-2447

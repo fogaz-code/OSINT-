@@ -1,0 +1,27 @@
+name: username_recon
+description: Cross-platform username presence check
+input_type: username
+risk: low
+steps:
+  - id: username_check
+    type: username
+    params:
+      # builtin = curated platforms; wmn = WhatsMyName sites from a LOCAL file only; all = both
+      # (WhatsMyName entries already covered by a built-in host are dropped).
+      platform_set: builtin
+      # Concurrent platform checks (1-16). Every request is also bounded by the step timeout.
+      max_workers: 8
+      # Local wmn-data.json (https://github.com/WebBreacher/WhatsMyName, CC BY-SA 4.0). Never
+      # downloaded by the tool; null falls back to the SECURE_OSINT_WMN_PATH environment variable.
+      wmn_path: null
+      wmn_include_nsfw: false
+    depends_on: []
+    optional_dependencies: []
+    # 30 built-in checks run 8 at a time (10s cap each, plus a calibration probe for web pages that
+    # look found); a WhatsMyName sweep has hundreds. Checks still pending at the deadline are
+    # reported as "deadline"; transient failures keep the result out of the cache, and above 25%
+    # failed checks (or a failed API platform) the result is marked partial (DEGRADED).
+    timeout: 90
+    retry: 1
+    risk: low
+    require_confirmation: false

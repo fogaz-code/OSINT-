@@ -1,0 +1,64 @@
+name: domain_recon
+description: >-
+  Domain reconnaissance from public sources: DNS records, RDAP registration, Wayback Machine URLs,
+  host search, Certificate Transparency subdomains and Shodan InternetDB exposure of the first IPv4.
+input_type: domain
+risk: low
+steps:
+  - id: dns_lookup
+    type: dns
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false
+  - id: rdap_lookup
+    type: rdap
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false
+  - id: wayback_urls
+    type: wayback
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 60
+    retry: 2
+    risk: low
+    require_confirmation: false
+  - id: host_search
+    type: hackertarget
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false
+  - id: subdomain_enum
+    type: crt_sh
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    # crt.sh often takes 30-60s: the timeout is the total budget, retries included.
+    timeout: 150
+    retry: 2
+    risk: low
+    require_confirmation: false
+  # Exposure of the first resolved IPv4: the value comes from dns_lookup through a reference.
+  - id: exposure
+    type: shodan_internetdb
+    params:
+      input: "{{ steps.dns_lookup.data.A[0] }}"
+    depends_on: [dns_lookup]
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false

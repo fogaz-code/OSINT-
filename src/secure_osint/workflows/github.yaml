@@ -1,0 +1,19 @@
+name: github_recon
+description: >-
+  GitHub repository metadata for an owner/repo target (or a public user search when the target has
+  no slash): description, language, stars, forks, licence, creation and last-push dates.
+input_type: github_repo
+risk: low
+# Single step on purpose. The only follow-ups the repository data would allow are checks on the
+# owner's account (username presence on other platforms), which is a pivot to a person: pivots are
+# suggested in the report, never executed by a workflow.
+steps:
+  - id: github_lookup
+    type: github
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false

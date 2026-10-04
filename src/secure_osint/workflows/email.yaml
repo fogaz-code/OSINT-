@@ -1,0 +1,26 @@
+name: email_recon
+description: Email footprint (MX, Gravatar, disposable domain) chained into DNS recon of the email domain
+input_type: email
+risk: low
+steps:
+  - id: email_check
+    type: email
+    params: {}
+    depends_on: []
+    optional_dependencies: []
+    timeout: 30
+    retry: 1
+    risk: low
+    require_confirmation: false
+  # Runs on the domain extracted by email_check, never on the full address: the reference makes
+  # email_check a hard dependency, so a failed email step skips this one instead of leaking the email.
+  - id: domain_dns
+    type: dns
+    params:
+      input: '{{ steps.email_check.data.email_domain }}'
+    depends_on: [email_check]
+    optional_dependencies: []
+    timeout: 30
+    retry: 2
+    risk: low
+    require_confirmation: false

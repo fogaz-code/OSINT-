@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secure-osint"
+version = "1.0.0"
+description = "Ethical, modular OSINT workflow automation for licensed investigation, due diligence, and digital-footprint self-audit."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "secure-osint contributors" }]
+maintainers = [{ name = "secure-osint contributors" }]
+keywords = ["osint", "security", "investigation", "due-diligence", "privacy", "reconnaissance"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Internet",
+    "Typing :: Typed",
+]
+# Dipendenze con limiti superiori: una major release a monte non deve rompere silenziosamente
+# una distribuzione già pubblicata. Allargare un vincolo solo dopo aver rieseguito la suite.
+dependencies = [
+    "typer>=0.9,<1",
+    "pydantic>=2.5,<3",
+    # http_client sostituisce il pool privato di HTTPTransport: aggiornare httpx solo dopo aver rieseguito i test SSRF.
+    "httpx>=0.28,<0.29",
+    "httpcore>=1.0,<2",
+    "PyYAML>=6.0,<7",
+    "dnspython>=2.4,<3",
+    "phonenumbers>=8.13,<9",
+    "rich>=13,<15",
+    "diskcache>=5.6,<6",
+    "cryptography>=42",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/fogaz-code/OSINT-"
+Repository = "https://github.com/fogaz-code/OSINT-"
+Issues = "https://github.com/fogaz-code/OSINT-/issues"
+
+[project.optional-dependencies]
+# Versioni dei tool vincolate: una release nuova non deve cambiare cosa fallisce in CI.
+dev = ["pytest>=7", "pytest-snapshot>=0.9,<1", "pytest-timeout>=2,<3", "ruff>=0.15,<0.17", "mypy>=1.10,<3", "types-PyYAML"]
+# Per creare un eseguibile standalone da consegnare a clienti non tecnici (vedi README).
+build = ["pyinstaller>=6,<7"]
+# Interfaccia web locale (secure-osint gui). Extra opzionale: gradio porta con sé FastAPI, uvicorn,
+# pandas, numpy... e non deve appesantire le installazioni solo-CLI né i binari PyInstaller.
+# Floor a 6.0: il codice usa l'API di Gradio 6 (theme/js in launch(), api_visibility) e la 4.x è EOL.
+gui = ["gradio>=6.0,<7"]
+# Grafo interattivo delle correlazioni (--graph nella CLI, pannello nella GUI). Extra opzionale:
+# pyvis porta con sé IPython, networkx e jsonpickle. Nota: pyvis 0.3.2 (2023) è l'ultima release e
+# il suo HTML carica Bootstrap da CDN anche in modalità "in_line": core/graph.py rimuove quei tag e
+# rifiuta di scrivere un grafo che contenga ancora URL esterni.
+graph = ["pyvis>=0.3.0,<1"]
+# Offline EXIF/XMP metadata of local images (image_exif source). exifread is pure Python and never
+# decodes pixels; defusedxml is the only parser allowed to see an (untrusted) XMP packet.
+image = ["exifread>=3,<4", "defusedxml>=0.7,<1"]
+
+[project.scripts]
+secure-osint = "secure_osint.cli:app"
+
+# Plugin di terze parti:
+# [project.entry-points."secure_osint.sources"]
+# shodan = "my_package.shodan:ShodanSource"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# I workflow YAML sono dati di runtime: devono finire nel wheel/sdist, altrimenti le installazioni
+# pipx e i binari PyInstaller non trovano nessun workflow.
+[tool.setuptools.package-data]
+secure_osint = ["workflows/*.yaml", "assets/*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A hung test (e.g. a catastrophic regex) fails with a traceback instead of eating the CI job budget.
+timeout = 300
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.format]
+# Il codice usa le virgolette singole: preservale invece di forzare le doppie.
+quote-style = "single"
+
+[tool.ruff.lint]
+# Selezione esplicita: da ruff 0.16 il set di default è più ampio (UP, SIM, I...). Adottarlo è un refactor a parte.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
