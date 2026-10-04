@@ -145,6 +145,7 @@ secure-osint run example.com            # auto-detects input type and workflow
 secure-osint run example.com --keep-network   # keep IP addresses in the report
 secure-osint run photo.jpg --keep-location    # image workflow; show the EXIF GPS position
 secure-osint run example.com --export graphml --export maltego_csv   # also export the correlations
+secure-osint investigate example.com --depth 1 --max-targets 10   # follow pivots, asking for each one
 secure-osint dry-run octocat/hello-world
 secure-osint validate my_workflow.yaml     # check a custom workflow file
 secure-osint sources                    # list built-in and plugin sources
@@ -160,6 +161,28 @@ Reports are written to `reports/latest.json` and `reports/latest.md`, readable b
 correlations next to them for Gephi, yEd or Maltego. The Markdown report ends with **Manual search
 queries** (JSON: `manual_queries`): search-engine dorks built from the correlations that the tool
 never runs.
+
+### Recursive investigation (`investigate`)
+
+`secure-osint investigate <target>` runs the target's workflow, then the usernames, emails and domains
+its results reveal, breadth first, inside an explicit scope:
+
+- `--follow username|email|domain` (repeatable, default all three) picks the selector kinds to follow;
+- `--depth N` (0-3, default 1) bounds the hops from the seed, `--max-targets N` (1-50, default 10) the
+  workflow runs in total, the seed included;
+- **every pivot is confirmed by the analyst** (default answer: no). `--approve-pivots` approves them in
+  advance; `--yes` only confirms workflow steps, never pivots;
+- shared webmail domains (gmail.com, outlook.com, ...) are never followed, and no selector runs twice.
+
+Pivots that are not run are still recorded with the reason (declined, budget exhausted, beyond the
+depth limit), so the record shows what was left out. Output, under `--output-dir`:
+`targets/NNN/latest.{json,md}` (one ordinary report per target, folders named by node id, never by
+target) and `investigation.{json,md}`: the pivot tree, where each pivot was found, the entities across
+all targets, and the SHA-256 of every per-target report, all covered by the record's own integrity hash.
+Values are redacted exactly as in the per-target reports.
+
+Each pivot is still a separate processing of personal data: approve only those you have a lawful basis
+for. A link between two targets is co-occurrence in public data, not a verified identity.
 
 ### Interactive investigation graph (`--graph`)
 
@@ -425,8 +448,8 @@ API-backed platform fails transiently, it is also marked partial (`DEGRADED`).
 The report ends its summary with a **Suggested Pivots** section, the JSON `correlations` carries a
 `suggested_pivots` list, and the graph shows them as gray, dashed-border nodes: public names found on
 confirmed profiles, other usernames, and emails observed in the data (including a domain's DNS SOA
-contact). **The tool never runs them.** Each pivot is a separate investigation you start yourself,
-only if you have a lawful basis for it (data minimisation). Emails stay redacted, so an email pivot
+contact). **`run` never runs them.** Each pivot is a separate investigation you start yourself (or
+approve one by one in `investigate`), only if you have a lawful basis for it (data minimisation). Emails stay redacted, so an email pivot
 shows only that one exists.
 
 ### DNS record semantics

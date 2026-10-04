@@ -94,6 +94,10 @@ class ReportGenerator:
             dict_results[step_id] = d
         return dict_results
 
+    def plain_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Step results as plain dicts, NOT redacted: input for correlation and pivot extraction only."""
+        return self._to_plain(results)
+
     def _redact_correlations(self, correlations: Dict[str, Any]) -> Dict[str, Any]:
         """Redact each entity through the same PrivacyGuard, de-duplicating after redaction.
 

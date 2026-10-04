@@ -336,6 +336,131 @@ def run(
         raise typer.Exit(code=1)
 
 
+class PivotKind(str, Enum):
+    """Selector kinds ``investigate`` may follow (see core.investigation.PIVOT_KINDS)."""
+
+    username = 'username'
+    email = 'email'
+    domain = 'domain'
+
+
+@app.command()
+def investigate(
+    input: str = typer.Argument(..., help='Seed target: domain, URL, IP, email, username, phone or wallet.'),
+    depth: int = typer.Option(1, min=0, max=3, help='Pivot hops from the seed (0 = the seed only).'),
+    max_targets: int = typer.Option(10, min=1, max=50, help='Workflow runs in total, the seed included.'),
+    follow: Optional[List[PivotKind]] = typer.Option(
+        None, '--follow', case_sensitive=False, help='Selector kind to follow: username, email or domain. Repeatable.'
+    ),
+    approve_pivots: bool = typer.Option(
+        False, '--approve-pivots', help='Run every in-scope pivot without asking (default: ask for each one).'
+    ),
+    workflow: str = typer.Option('auto', help='Workflow for the seed, or auto to pick it from the input type.'),
+    workflow_dir: str = typer.Option(DEFAULT_WORKFLOW_DIR, help='Directory containing the workflow YAML files.'),
+    output_dir: str = typer.Option('reports', help='Directory where the investigation is written.'),
+    keep_network: bool = typer.Option(False, help='Do not redact IP addresses (useful for domain recon).'),
+    keep_location: bool = typer.Option(False, help='Do not redact GPS coordinates and map links.'),
+    keep_crypto: bool = typer.Option(False, help='Do not redact cryptocurrency wallet addresses.'),
+    keep_device: bool = typer.Option(False, help='Do not redact camera/lens serial numbers.'),
+    yes: bool = typer.Option(
+        False, '--yes', '-y', help='Automatically confirm workflow steps that require confirmation (not pivots).'
+    ),
+    max_workers: int = typer.Option(8, min=1, max=64, help='Maximum number of steps running in parallel.'),
+    log_level: str = typer.Option('WARNING', help='Log level (DEBUG, INFO, WARNING, ERROR).'),
+    log_json: bool = typer.Option(False, help='Structured JSON logs on stderr.'),
+    quiet: bool = typer.Option(False, '--quiet', '-q', help='No output except errors and pivot prompts.'),
+    cache: bool = typer.Option(True, '--cache/--no-cache', help='Encrypted cache of source results.'),
+    cache_ttl: int = typer.Option(3600, min=0, help='Cache lifetime in seconds (0 = do not store).'),
+    case_id: Optional[str] = typer.Option(
+        None, '--case-id', help='Case ID stamped on every report and on the logs (chain of custody).'
+    ),
+) -> None:
+    """Investigate a target and, within the given scope, the selectors its results reveal."""
+    from secure_osint.core.engine import WorkflowEngine
+    from secure_osint.core.investigation import PIVOT_KINDS, InvestigationNode, PivotCandidate
+    from secure_osint.core.investigation import investigate as run_investigation
+    from secure_osint.core.investigation_report import InvestigationReporter
+
+    configure_logging(log_level, log_json)
+    register_sensitive_values([input])
+    if case_id:
+        logging.getLogger('secure_osint').info('investigation started', extra={'case_id': case_id})
+    try:
+        input, workflow = _resolve(input, workflow, quiet)
+        wf_seed = _load(workflow, workflow_dir)
+        seed_kind = detect_input_type(input, allow_files=False)
+    except ValueError as e:
+        _fail(str(e))
+    if workflow == 'image':
+        _fail('Images have no selectors to follow: use "secure-osint run" on an image.')
+    register_sensitive_values([input])
+    follow_kinds = tuple(dict.fromkeys(k.value for k in follow)) if follow else PIVOT_KINDS
+    workflows: Dict[str, WorkflowConfig] = {workflow: wf_seed}
+
+    def confirm_step(step: StepConfig) -> bool:
+        prompt = safe_text(f'Step {step.id} ({step.type}, risk={step.risk}) requires confirmation. Run it?', True)
+        return yes or typer.confirm(prompt)
+
+    guard = PrivacyGuard(categories=privacy_categories(keep_network, keep_location, keep_crypto, keep_device))
+    reporter = ReportGenerator(guard, case_id=case_id)
+    inv_reporter = InvestigationReporter(reporter)
+    console = Console(stderr=True)  # progress and prompts on stderr: stdout stays for the summary
+    result_cache = _open_cache(cache_ttl) if cache else None
+    engine = WorkflowEngine(
+        allow_partial_results=True,
+        max_workers=max_workers,
+        confirm=confirm_step,
+        cache=result_cache,
+        cache_ttl=cache_ttl,
+    )
+
+    def run_target(value: str, name: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        register_sensitive_values([value])  # every followed selector is scrubbed from the logs too
+        if name not in workflows:
+            workflows[name] = _load(name, workflow_dir)
+        results = engine.execute(workflows[name], value)
+        return results, reporter.plain_results(results)
+
+    def confirm_pivot(candidate: PivotCandidate, parent: InvestigationNode) -> bool:
+        if approve_pivots:
+            return True
+        shown = inv_reporter.display(InvestigationNode(0, candidate.kind, candidate.value, 0, None))
+        origin = inv_reporter.display(parent)
+        prompt = (
+            f'Pivot: {candidate.kind} {shown} (found in {", ".join(candidate.found_in)} of {origin}). Investigate it?'
+        )
+        return typer.confirm(safe_text(prompt, single_line=True), default=False, err=True)
+
+    def on_node(node: InvestigationNode) -> None:
+        if quiet:
+            return
+        line = f'[{node.id:03d}] depth {node.depth} {node.kind} {inv_reporter.display(node)}: {node.outcome}'
+        console.print(rich_safe(line), highlight=False)
+
+    try:
+        investigation = run_investigation(
+            input,
+            seed_kind,
+            workflow,
+            run_target,
+            follow=follow_kinds,
+            max_depth=depth,
+            max_targets=max_targets,
+            confirm=confirm_pivot,
+            on_node=on_node,
+        )
+    finally:
+        if result_cache is not None:
+            result_cache.close()
+
+    paths = inv_reporter.write(investigation, Path(output_dir))
+    if not quiet:
+        run = len(investigation.runs)
+        left = sum(1 for n in investigation.nodes if n.outcome not in ('run', 'failed'))
+        typer.echo(f'Investigation: {run} target(s) investigated, {left} pivot(s) not followed.')
+        typer.echo(f'Record saved to {safe_text(str(paths["json"]))} and {safe_text(str(paths["markdown"]))}')
+
+
 @app.command()
 def dry_run(
     input: str = typer.Argument(..., help='Target to plan an investigation for.'),
