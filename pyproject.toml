@@ -53,7 +53,7 @@ Issues = "https://github.com/fogaz-code/OSINT-/issues"
 
 [project.optional-dependencies]
 # Versioni dei tool vincolate: una release nuova non deve cambiare cosa fallisce in CI.
-dev = ["pytest>=7", "pytest-snapshot>=0.9,<1", "pytest-timeout>=2,<3", "ruff>=0.15,<0.17", "mypy>=1.10,<3", "types-PyYAML"]
+dev = ["pytest>=7", "pytest-snapshot>=0.9,<1", "pytest-timeout>=2,<3", "ruff>=0.15,<0.18", "mypy>=1.10,<3", "types-PyYAML"]
 # Per creare un eseguibile standalone da consegnare a clienti non tecnici (vedi README).
 build = ["pyinstaller>=6,<7"]
 # Interfaccia web locale (secure-osint gui). Extra opzionale: gradio porta con sé FastAPI, uvicorn,
